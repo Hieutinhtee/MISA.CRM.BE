@@ -1,0 +1,6 @@
+@MISA.CRM.API_HostAddress = http://localhost:5051
+
+GET {{MISA.CRM.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
