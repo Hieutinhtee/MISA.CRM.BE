@@ -29,6 +29,15 @@ namespace MISA.CRM.CORE.Interfaces.Repositories
         Task<T?> GetById(Guid id);
 
         /// <summary>
+        /// Hàm sắp xếp 1 cột trong bảng
+        /// </summary>
+        /// <param name="sortField"> tên cột muốn sắp xếp </param>
+        /// <param name="asc"> true là tăng dần, false là giảm dần </param>
+        /// <returns>đối tượng có id phù hợp</returns>
+        /// Created By: TMHieu (03/12/2025)
+        Task<List<T>> GetAllSortedAsync(string sortField, bool asc = true);
+
+        /// <summary>
         /// Hàm thêm mới bản ghi trong database
         /// </summary>
         /// <param name="entity">thuộc tính của thực thể muốn thêm</param>
