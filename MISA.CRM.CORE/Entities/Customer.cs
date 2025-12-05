@@ -20,14 +20,14 @@ namespace MISA.CRM.CORE.Entities
         /// ID khách hàng (UUID)
         /// </summary>
         [Key]
-        [ColumnName("crm_customer_id")]
+        [Column("crm_customer_id")]
         public Guid CustomerId { get; set; }
 
         /// <summary>
         /// Loại khách hàng: NBH01, LKHA, VIP
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_type")]
+        [Column("crm_customer_type")]
         [MaxLength(20)]
         public string CustomerType { get; set; }
 
@@ -35,7 +35,7 @@ namespace MISA.CRM.CORE.Entities
         /// Mã khách hàng: KHyyyyMM + 6 số tăng mãi, không reset
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_code")]
+        [Column("crm_customer_code")]
         [MaxLength(20)]
         public string CustomerCode { get; set; }
 
@@ -43,7 +43,7 @@ namespace MISA.CRM.CORE.Entities
         /// Tên đầy đủ khách hàng (cá nhân hoặc công ty)
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_name")]
+        [Column("crm_customer_name")]
         [MaxLength(500)]
         public string FullName { get; set; }
 
@@ -51,7 +51,7 @@ namespace MISA.CRM.CORE.Entities
         /// Số điện thoại - duy nhất
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_phone_number")]
+        [Column("crm_customer_phone_number")]
         [MaxLength(50)]
         public string Phone { get; set; }
 
@@ -59,7 +59,7 @@ namespace MISA.CRM.CORE.Entities
         /// Email - duy nhất
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_email")]
+        [Column("crm_customer_email")]
         [MaxLength(100)]
         public string Email { get; set; }
 
@@ -67,7 +67,7 @@ namespace MISA.CRM.CORE.Entities
         /// Địa chỉ liên hệ chính
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_address")]
+        [Column("crm_customer_address")]
         [MaxLength(255)]
         public string Address { get; set; }
 
@@ -75,7 +75,7 @@ namespace MISA.CRM.CORE.Entities
         /// Địa chỉ giao hàng
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_shipping_address")]
+        [Column("crm_customer_shipping_address")]
         [MaxLength(255)]
         public string ShippingAddress { get; set; }
 
@@ -83,34 +83,34 @@ namespace MISA.CRM.CORE.Entities
         /// Mã số thuế
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_tax_code")]
+        [Column("crm_customer_tax_code")]
         [MaxLength(20)]
         public string TaxCode { get; set; }
 
         /// <summary>
         /// Ngày mua hàng gần nhất
         /// </summary>
-        [ColumnName("crm_customer_last_purchase_date")]
+        [Column("crm_customer_last_purchase_date")]
         public DateTime? LastPurchaseDate { get; set; }
 
         /// <summary>
         /// Mã hàng hóa mua gần nhất (mock)
         /// </summary>
-        [ColumnName("crm_customer_purchased_item_code")]
+        [Column("crm_customer_purchased_item_code")]
         [MaxLength(20)]
         public string LastPurchasedItemCode { get; set; }
 
         /// <summary>
         /// Tên hàng hóa mua gần nhất
         /// </summary>
-        [ColumnName("crm_customer_purchased_item_name")]
+        [Column("crm_customer_purchased_item_name")]
         [MaxLength(100)]
         public string LastPurchasedItemName { get; set; }
 
         /// <summary>
         /// Đường dẫn ảnh đại diện
         /// </summary>
-        [ColumnName("crm_customer_image")]
+        [Column("crm_customer_image")]
         [MaxLength(255)]
         public string ImageUrl { get; set; }
 
@@ -118,7 +118,7 @@ namespace MISA.CRM.CORE.Entities
         /// Trạng thái xóa mềm
         /// </summary>
         [Required]
-        [ColumnName("crm_customer_is_deleted")]
+        [Column("crm_customer_is_deleted")]
         public bool IsDeleted { get; set; } = false;
 
         //sẽ thêm sau này

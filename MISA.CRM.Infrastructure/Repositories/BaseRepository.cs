@@ -9,6 +9,7 @@ using MISA.CRM.CORE.Interfaces.Repositories;
 using MISA.CRM.Infrastructure.Connection;
 using MISA.CRM.CORE.Attributes;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MISA.CRM.Infrastructure.Repositories
 {
@@ -30,6 +31,8 @@ namespace MISA.CRM.Infrastructure.Repositories
         // Tên cột khóa chính, mặc định là Id
         protected readonly string _idColumn;
 
+        protected readonly string _softKeyDelete;
+
         /// <summary>
         /// Constructor cho BaseRepository.
         /// Khởi tạo factory kết nối và xác định tên bảng/entity.
@@ -46,6 +49,9 @@ namespace MISA.CRM.Infrastructure.Repositories
             var tableAttr = typeof(T).GetCustomAttribute<TableNameAttribute>();
             _tableName = tableAttr != null ? tableAttr.Name : "crm_" + ToSnakeCase(typeof(T).Name);
 
+            RegisterTypeMap<T>();
+
+            _softKeyDelete = "crm_" + ToSnakeCase(typeof(T).Name) + "_is_deleted";
             //Lấy tên Id từ property có attribute [Key]
             var keyProp = typeof(T)
                         .GetProperties()
@@ -58,7 +64,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             else
             {
                 //Lấy ColumnName từ attribute nếu có
-                var colAttr = keyProp.GetCustomAttribute<ColumnNameAttribute>();
+                var colAttr = keyProp.GetCustomAttribute<ColumnAttribute>();
 
                 _idColumn = colAttr != null ? colAttr.Name : keyProp.Name;
             }
@@ -91,6 +97,26 @@ namespace MISA.CRM.Infrastructure.Repositories
             return result;
         }
 
+        public static void RegisterTypeMap<T>()
+        {
+            SqlMapper.SetTypeMap(
+                typeof(T),
+                new CustomPropertyTypeMap(
+                    typeof(T),
+                    (type, columnName) =>
+                    {
+                        return type.GetProperties()
+                            .FirstOrDefault(prop =>
+                            {
+                                var attr = prop.GetCustomAttributes(typeof(ColumnAttribute), true)
+                                              .OfType<ColumnAttribute>()
+                                              .FirstOrDefault();
+                                return attr != null && attr.Name == columnName;
+                            });
+                    })
+            );
+        }
+
         /// <summary>
         /// Property để lấy connection từ factory.
         /// Mỗi lần gọi sẽ tạo mới connection để tránh reuse sai.
@@ -116,7 +142,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             // Sử dụng using để tự động đóng connection sau khi dùng xong
             using var conn = Connection;
             // SQL chỉ lấy các record chưa xóa (is_deleted = 0)
-            var sql = $"SELECT * FROM {_tableName} WHERE is_deleted = 0";
+            var sql = $"SELECT * FROM {_tableName} WHERE {_softKeyDelete} = 0";
             var res = await conn.QueryAsync<T>(sql);
             return res.ToList();
         }
@@ -131,7 +157,7 @@ namespace MISA.CRM.Infrastructure.Repositories
         {
             using var conn = Connection;
             // SQL lấy record đầu tiên khớp Id và chưa xóa mềm
-            var sql = $"SELECT * FROM {_tableName} WHERE {_idColumn} = @Id AND is_deleted = 0 LIMIT 1";
+            var sql = $"SELECT * FROM {_tableName} WHERE {_idColumn} = @Id AND {_softKeyDelete} = 0 LIMIT 1";
             return await conn.QueryFirstOrDefaultAsync<T>(sql, new { Id = id });
         }
 
@@ -148,10 +174,10 @@ namespace MISA.CRM.Infrastructure.Repositories
             // Lấy danh sách property có attribute [ColumnName] để mapping
             var properties = typeof(T)
                 .GetProperties()
-                .Where(p => p.GetCustomAttribute<ColumnNameAttribute>() != null)
+                .Where(p => p.GetCustomAttribute<ColumnAttribute>() != null)
                 .ToList();
             // Tạo chuỗi columns từ attribute Name
-            var columns = string.Join(", ", properties.Select(p => p.GetCustomAttribute<ColumnNameAttribute>()!.Name));
+            var columns = string.Join(", ", properties.Select(p => p.GetCustomAttribute<ColumnAttribute>()!.Name));
             // Tạo chuỗi param names (@PropertyName)
             var paramNames = string.Join(", ", properties.Select(p => "@" + p.Name));
             // Xây dựng SQL INSERT
@@ -195,18 +221,18 @@ namespace MISA.CRM.Infrastructure.Repositories
             var properties = typeof(T)
                 .GetProperties()
                 .Where(p =>
-                    p.GetCustomAttribute<ColumnNameAttribute>() != null
+                    p.GetCustomAttribute<ColumnAttribute>() != null
                     && p != keyProp)
                 .ToList();
 
             // Tạo chuỗi "Col1 = @Prop1, Col2 = @Prop2"
             var setClause = string.Join(", ",
                 properties.Select(p =>
-                    $"{p.GetCustomAttribute<ColumnNameAttribute>()!.Name} = @{p.Name}"
+                    $"{p.GetCustomAttribute<ColumnAttribute>()!.Name} = @{p.Name}"
                 ));
 
             // Lấy tên cột khóa chính trong DB
-            var keyColumnName = keyProp.GetCustomAttribute<ColumnNameAttribute>()?.Name ?? keyProp.Name;
+            var keyColumnName = keyProp.GetCustomAttribute<ColumnAttribute>()?.Name ?? keyProp.Name;
 
             var sql = $"UPDATE {_tableName} SET {setClause} WHERE {keyColumnName} = @Id;";
 
@@ -235,7 +261,7 @@ namespace MISA.CRM.Infrastructure.Repositories
         {
             using var conn = Connection;
 
-            // Lấy tên cột thực trong DB qua ColumnNameAttribute
+            // Lấy tên cột thực trong DB qua ColumnAttribute
             var prop = typeof(T).GetProperties()
                 .FirstOrDefault(p =>
                     p.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
@@ -243,13 +269,13 @@ namespace MISA.CRM.Infrastructure.Repositories
             if (prop == null)
                 throw new Exception($"Property '{columnName}' không tồn tại trên entity.");
 
-            var colAttr = prop.GetCustomAttribute<ColumnNameAttribute>();
+            var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
             var dbColumn = colAttr != null ? colAttr.Name : columnName;
 
             var sql = $@" UPDATE {_tableName}
                           SET {dbColumn} = @Value
                           WHERE {_idColumn} IN @Ids
-                          AND is_deleted = 0;";
+                          AND {_softKeyDelete} = 0;";
 
             var parameters = new DynamicParameters();
             parameters.Add("@Value", value);
@@ -268,7 +294,7 @@ namespace MISA.CRM.Infrastructure.Repositories
         {
             using var conn = Connection;
             // SQL UPDATE để xóa mềm (set is_deleted = 1)
-            var sql = $"UPDATE {_tableName} SET is_deleted = 1 WHERE {_idColumn} = @Id AND is_deleted = 0";
+            var sql = $"UPDATE {_tableName} SET {_softKeyDelete} = 1 WHERE {_idColumn} = @Id AND {_softKeyDelete} = 0";
             return await conn.ExecuteAsync(sql, new { Id = id });
         }
 
@@ -291,7 +317,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             var order = asc ? "ASC" : "DESC";
             using var conn = Connection;
             // SQL với ORDER BY và chỉ lấy chưa xóa
-            var sql = $"SELECT * FROM {_tableName} WHERE is_deleted = 0 ORDER BY {sortField} {order}";
+            var sql = $"SELECT * FROM {_tableName} WHERE {_softKeyDelete} = 0 ORDER BY {sortField} {order}";
             var res = await conn.QueryAsync<T>(sql);
             return res.ToList();
         }
@@ -325,9 +351,9 @@ namespace MISA.CRM.Infrastructure.Repositories
             }
             using var conn = Connection;
             // SQL lấy data với paging và chỉ lấy chưa xóa
-            var sqlData = $"SELECT * FROM {_tableName} WHERE is_deleted = 0 {orderClause} LIMIT @Limit OFFSET @Offset";
+            var sqlData = $"SELECT * FROM {_tableName} WHERE {_softKeyDelete} = 0 {orderClause} LIMIT @Limit OFFSET @Offset";
             // SQL đếm tổng chỉ tính chưa xóa
-            var sqlCount = $"SELECT COUNT(1) FROM {_tableName} WHERE is_deleted = 0";
+            var sqlCount = $"SELECT COUNT(1) FROM {_tableName} WHERE {_softKeyDelete} = 0";
             // Chạy parallel để tối ưu
             var taskData = conn.QueryAsync<T>(sqlData, new { Limit = pageSize, Offset = offset });
             var taskCount = conn.ExecuteScalarAsync<int>(sqlCount);
@@ -350,7 +376,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             // Sử dụng using để tự động đóng connection sau khi dùng xong
             using var conn = Connection;
 
-            var sql = $@" SELECT * FROM {_tableName} WHERE {_idColumn} = @Id AND is_deleted = 0;";
+            var sql = $@" SELECT * FROM {_tableName} WHERE {_idColumn} = @Id AND {_softKeyDelete} = 0;";
 
             var entity = await conn.QueryFirstOrDefaultAsync<T>(sql, new { Id = id });
             return entity;
@@ -373,15 +399,15 @@ namespace MISA.CRM.Infrastructure.Repositories
                 throw new Exception($"Property '{propertyName}' không tồn tại trong {typeof(T).Name}");
 
             // Lấy ColumnName từ attribute
-            var columnAttr = prop.GetCustomAttribute<ColumnNameAttribute>();
+            var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
             if (columnAttr == null)
-                throw new Exception($"Property '{propertyName}' không có ColumnNameAttribute");
+                throw new Exception($"Property '{propertyName}' không có ColumnAttribute");
 
             var columnName = columnAttr.Name; // Tên cột trong DB
             var sql = $@"SELECT COUNT(1)
                          FROM {_tableName}
                          WHERE {columnName} = @Value
-                         AND is_deleted = 0
+                         AND {_softKeyDelete} = 0
                          AND (@IgnoreId IS NULL OR {_idColumn} <> @IgnoreId);";
 
             var count = await conn.ExecuteScalarAsync<int>(sql, new
