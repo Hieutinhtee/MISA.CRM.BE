@@ -95,6 +95,21 @@ namespace MISA.CRM.CORE.Services
         public virtual async Task<Guid> CreateAsync(T entity)
         {
             await ValidateAsync(entity, null);
+            // Lấy tất cả property của entity
+            var properties = typeof(T).GetProperties();
+
+            foreach (var prop in properties)
+            {
+                // Nếu property là Guid và hiện tại là Guid.Empty thì sinh mới
+                if (prop.PropertyType == typeof(Guid))
+                {
+                    var currentValue = (Guid)prop.GetValue(entity)!;
+                    if (currentValue == Guid.Empty)
+                    {
+                        prop.SetValue(entity, Guid.NewGuid());
+                    }
+                }
+            }
             return await _repo.InsertAsync(entity);
         }
 

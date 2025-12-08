@@ -22,7 +22,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Loại khách hàng
         /// </summary>
-        [Required]
+
         [MaxLength(20)]
         [Column("crm_customer_type")]
         public string CrmCustomerType { get; set; }
@@ -30,7 +30,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Mã khách hàng
         /// </summary>
-        [Required]
+
         [MaxLength(20)]
         [Column("crm_customer_code")]
         public string CrmCustomerCode { get; set; }
@@ -38,7 +38,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Tên đầy đủ khách hàng
         /// </summary>
-        [Required]
+
         [MaxLength(500)]
         [Column("crm_customer_name")]
         public string CrmCustomerName { get; set; }
@@ -46,7 +46,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Số điện thoại
         /// </summary>
-        [Required]
+
         [MaxLength(50)]
         [Column("crm_customer_phone_number")]
         public string CrmCustomerPhoneNumber { get; set; }
@@ -54,7 +54,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Email
         /// </summary>
-        [Required]
+
         [MaxLength(100)]
         [Column("crm_customer_email")]
         public string CrmCustomerEmail { get; set; }
@@ -62,7 +62,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Địa chỉ liên hệ chính
         /// </summary>
-        [Required]
+
         [MaxLength(255)]
         [Column("crm_customer_address")]
         public string CrmCustomerAddress { get; set; }
@@ -70,7 +70,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Địa chỉ giao hàng
         /// </summary>
-        [Required]
+
         [MaxLength(255)]
         [Column("crm_customer_shipping_address")]
         public string CrmCustomerShippingAddress { get; set; }
@@ -78,7 +78,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Mã số thuế
         /// </summary>
-        [Required]
+
         [MaxLength(20)]
         [Column("crm_customer_tax_code")]
         public string CrmCustomerTaxCode { get; set; }
@@ -113,7 +113,7 @@ namespace MISA.CRM.CORE.Entities
         /// <summary>
         /// Trạng thái xóa mềm
         /// </summary>
-        [Required]
+
         [Column("crm_customer_is_deleted")]
         public bool CrmCustomerIsDeleted { get; set; } = false;
     }

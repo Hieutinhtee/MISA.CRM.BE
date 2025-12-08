@@ -32,7 +32,11 @@ namespace MISA.CRM.Infrastructure.Repositories
         // Tên cột khóa chính, mặc định là Id
         protected readonly string _idColumn;
 
+        //Tên cột đánh dấu xóa mềm
         protected readonly string _softKeyDelete;
+
+        //Tên cột mã tự sinh dùng để sắp xếp mặc định
+        protected readonly string _defaultSortFiled;
 
         /// <summary>
         /// Constructor cho BaseRepository.
@@ -54,7 +58,7 @@ namespace MISA.CRM.Infrastructure.Repositories
 
             // 3. Tạo soft delete key: "crm_customer_is_deleted"
             _softKeyDelete = _tableName + "_is_deleted";
-
+            _defaultSortFiled = _tableName + "_code";
             // 4. Lấy property Key
             var keyProp = type.GetProperties()
                               .FirstOrDefault(p => p.GetCustomAttribute<KeyAttribute>() != null);
@@ -133,7 +137,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             // Sử dụng using để tự động đóng connection sau khi dùng xong
             using var conn = Connection;
             // SQL chỉ lấy các record chưa xóa (is_deleted = 0)
-            var sql = $"SELECT * FROM {_tableName} WHERE {_softKeyDelete} = 0";
+            var sql = $"SELECT * FROM {_tableName} WHERE {_softKeyDelete} = 0 ORDER BY RIGHT({_defaultSortFiled}, 6) * 1 DESC;";
             var res = await conn.QueryAsync<T>(sql);
             return res.ToList();
         }
@@ -314,7 +318,7 @@ namespace MISA.CRM.Infrastructure.Repositories
         /// Kiểm tra giá trị có tồn tại trong cột (bỏ qua soft delete và ignoreId nếu có).
         /// Created by: TMHieu (05/12/2025)
         /// </summary>
-        /// <param name="propertyOrColumnName">Truyền vào kiểu giống nameof(Customer.Phone) hàm sẽ tự map với tên cột</param>
+        /// <param name="propertyOrColumnName">Truyền vào tên cột hàm sẽ tự map với tên cột</param>
         /// <param name="value">Giá trị cần kiểm tra.</param>
         /// <param name="ignoreId">ID cần bỏ qua (khi update để tránh trùng chính nó).</param>
         /// <returns>True nếu tồn tại, False nếu không.</returns>
@@ -405,7 +409,7 @@ namespace MISA.CRM.Infrastructure.Repositories
             else
             {
                 // FE không truyền sortField → default sort theo khóa chính
-                orderClause = $" ORDER BY {_idColumn} DESC ";
+                orderClause = $" ORDER BY RIGHT({_defaultSortFiled}, 6) * 1 DESC";
             }
 
             // 3. Tạo điều kiện WHERE cơ bản (is_deleted = 0)

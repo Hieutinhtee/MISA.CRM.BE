@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MISA.CRM.Core.DTOs.Responses;
+using MISA.CRM.CORE.DTOs.Requests;
 using MISA.CRM.CORE.Exceptions;
 using MISA.CRM.CORE.Interfaces.Services;
 
@@ -40,15 +41,8 @@ namespace MISA.CRM.API.Controllers
         [HttpPost]
         public virtual async Task<IActionResult> Create([FromBody] T entity)
         {
-            try
-            {
-                var id = await _service.CreateAsync(entity);
-                return StatusCode(201, new { id, message = "Created successfully" });
-            }
-            catch (ValidateException ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var id = await _service.CreateAsync(entity);
+            return StatusCode(201, new { id, message = "Created successfully" });
         }
 
         [HttpPut("{id}")]
@@ -107,6 +101,31 @@ namespace MISA.CRM.API.Controllers
         {
             var response = await _service.QueryPagingAsync(page, pageSize, search, sortBy, sortOrder);
             return response;
+        }
+
+        /// <summary>
+        /// Cập nhật cùng 1 giá trị cho nhiều bản ghi
+        /// </summary>
+        /// <param name="request">Thông tin danh sách id, tên cột, giá trị mới</param>
+        /// <returns>Số bản ghi đã được cập nhật</returns>
+        [HttpPost("bulk-update")]
+        public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
+        {
+            if (request == null || request.Ids == null || request.Ids.Count == 0)
+                return BadRequest(new { message = "Danh sách Id không được rỗng." });
+
+            if (string.IsNullOrWhiteSpace(request.ColumnName))
+                return BadRequest(new { message = "Tên cột không được rỗng." });
+
+            try
+            {
+                int updatedCount = await _service.BulkUpdateSameValueAsync(request.Ids, request.ColumnName, request.Value);
+                return Ok(new { updatedCount });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }
