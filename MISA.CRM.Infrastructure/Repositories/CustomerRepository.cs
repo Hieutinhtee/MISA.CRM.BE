@@ -53,7 +53,8 @@ namespace MISA.CRM.Infrastructure.Repositories
             {
                 "crm_customer_phone_number",
                 "crm_customer_name",
-                "crm_customer_email"
+                "crm_customer_email",
+                "crm_customer_type"
             };
         }
     }

@@ -1,4 +1,6 @@
-﻿using MISA.CRM.CORE.Entities;
+﻿using CsvHelper.Configuration;
+using MISA.CRM.CORE.DTOs.Map;
+using MISA.CRM.CORE.Entities;
 using MISA.CRM.CORE.Exceptions;
 using MISA.CRM.CORE.Interfaces.Repositories;
 using MISA.CRM.CORE.Interfaces.Services;
@@ -64,10 +66,10 @@ namespace MISA.CRM.CORE.Services
                 throw new ValidateException("Invalid email format", "Email không đúng định dạng");
 
             // 4. Check unique - dùng repo
-            if (await _repo.IsValueExistAsync(nameof(Customer.CrmCustomerPhoneNumber), customer.CrmCustomerPhoneNumber, ignoreId))
+            if (await _repo.IsValueExistAsync("CrmCustomerPhoneNumber", customer.CrmCustomerPhoneNumber, ignoreId))
                 throw new ValidateException("Phone duplicate", "Số điện thoại đã tồn tại");
 
-            if (await _repo.IsValueExistAsync(nameof(Customer.CrmCustomerEmail), customer.CrmCustomerEmail, ignoreId))
+            if (await _repo.IsValueExistAsync("CrmCustomerEmail", customer.CrmCustomerEmail, ignoreId))
                 throw new ValidateException("Email duplicate", "Email đã tồn tại");
         }
     }

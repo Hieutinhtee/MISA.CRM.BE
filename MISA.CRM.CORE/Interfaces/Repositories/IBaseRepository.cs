@@ -82,6 +82,14 @@ namespace MISA.CRM.CORE.Interfaces.Repositories
         /// <param name="sortOrder">Hướng sắp xếp (ASC/DESC)</param>
         /// <returns>Đối tượng PagingResponse chứa dữ liệu và metadata</returns>
         /// Created By: TMHieu (07/12/2025)
-        Task<PagingResponse<T>> QueryPagingAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder);
+        Task<PagingResponse<T>> QueryPagingAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder, string? type = null);
+
+        /// <summary>
+        /// Bulk insert dùng 1 query thực hiện cho toàn bộ danh sách
+        /// </summary>
+        /// <param name="entities">Danh sách entity cần insert</param>
+        /// Created By: TMHieu (12/12/2025)
+        /// <returns>Số bản ghi insert thành công</returns>
+        Task<int> BulkInsertAsync(IEnumerable<T> entities);
     }
 }

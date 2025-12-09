@@ -78,17 +78,29 @@ namespace MISA.CRM.API.Controllers
         }
 
         [HttpPost("check-duplicate")]
-        public virtual async Task<IActionResult> CheckDuplicate([FromBody] T entity)
+        public virtual async Task<IActionResult> CheckDuplicate([FromBody] DuplicateCheckRequest req)
         {
-            try
+            if (req == null)
+                throw new ValidateException("Dữ liệu gửi lên không hợp lệ");
+
+            // Parse IgnoreId (accept null or invalid string)
+            Guid? ignoreGuid = null;
+            if (!string.IsNullOrWhiteSpace(req.IgnoreId)
+                && Guid.TryParse(req.IgnoreId, out Guid parsed))
             {
-                var id = await _service.CreateAsync(entity);
-                return StatusCode(201, new { id, message = "Created successfully" });
+                ignoreGuid = parsed;
             }
-            catch (ValidateException ex)
+
+            // Validate fields
+            if (string.IsNullOrWhiteSpace(req.PropertyName) ||
+                string.IsNullOrWhiteSpace(req.Value))
             {
-                return BadRequest(new { error = ex.Message });
+                throw new ValidateException("Thiếu trường cần thiết để kiểm tra trùng");
             }
+
+            bool exists = await _service.IsValueExistAsync(req.PropertyName, req.Value, ignoreGuid);
+
+            return Ok(new { isDuplicate = exists });
         }
 
         [HttpGet("paging")]
@@ -96,10 +108,11 @@ namespace MISA.CRM.API.Controllers
                                                        [FromQuery] int pageSize = 100,
                                                        [FromQuery] string? search = null,
                                                        [FromQuery] string? sortBy = null,
-                                                       [FromQuery] string? sortOrder = null
+                                                       [FromQuery] string? sortOrder = null,
+                                                       [FromQuery] string? type = null
         )
         {
-            var response = await _service.QueryPagingAsync(page, pageSize, search, sortBy, sortOrder);
+            var response = await _service.QueryPagingAsync(page, pageSize, search, sortBy, sortOrder, type);
             return response;
         }
 
@@ -112,10 +125,10 @@ namespace MISA.CRM.API.Controllers
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
             if (request == null || request.Ids == null || request.Ids.Count == 0)
-                return BadRequest(new { message = "Danh sách Id không được rỗng." });
+                throw new ValidateException("Danh sách ID không được rỗng.");
 
             if (string.IsNullOrWhiteSpace(request.ColumnName))
-                return BadRequest(new { message = "Tên cột không được rỗng." });
+                throw new ValidateException("Tên cột không được để trống.");
 
             try
             {
@@ -124,8 +137,29 @@ namespace MISA.CRM.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                throw new ValidateException($"Lỗi khi cập nhật: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Import CSV
+        /// </summary>
+        /// <param name="file">File CSV</param>
+        /// <returns>Số bản ghi insert thành công</returns>
+        [HttpPost("import")]
+        public async Task<IActionResult> ImportCsv(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("File rỗng.");
+
+            int insertedCount;
+
+            using (var stream = file.OpenReadStream())
+            {
+                insertedCount = await _service.ImportFromCsvAsync(stream);
+            }
+
+            return Ok(new { insertedCount });
         }
     }
 }

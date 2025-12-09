@@ -380,7 +380,8 @@ namespace MISA.CRM.Infrastructure.Repositories
             int pageSize,
             string? search,
             string? sortBy,
-            string? sortOrder
+            string? sortOrder,
+            string? type = null // thêm param type
         )
         {
             using var conn = Connection;
@@ -391,10 +392,8 @@ namespace MISA.CRM.Infrastructure.Repositories
 
             string orderClause = "";
 
-            // Nếu FE truyền sortField
             if (!string.IsNullOrWhiteSpace(sortBy))
             {
-                // Nếu repo con không override hoặc whitelist rỗng → cho phép tất cả cột
                 if (sortableFields == null || sortableFields.Count == 0 || sortableFields.Contains(sortBy.ToLower()))
                 {
                     string direction = sortOrder?.ToUpper() == "DESC" ? "DESC" : "ASC";
@@ -402,26 +401,27 @@ namespace MISA.CRM.Infrastructure.Repositories
                 }
                 else
                 {
-                    // sortField không hợp lệ theo whitelist → fallback sort theo khóa chính
                     orderClause = $" ORDER BY {_idColumn} DESC ";
                 }
             }
             else
             {
-                // FE không truyền sortField → default sort theo khóa chính
                 orderClause = $" ORDER BY RIGHT({_defaultSortFiled}, 6) * 1 DESC";
             }
 
-            // 3. Tạo điều kiện WHERE cơ bản (is_deleted = 0)
+            // 2. Tạo điều kiện WHERE cơ bản
             var where = $" WHERE {_softKeyDelete} = 0 ";
+
+            // 3. Nếu truyền type thì lọc trước
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                where += " AND " + _tableName + "_type" + " = @Type ";
+            }
 
             // 4. Thêm search nếu có
             if (!string.IsNullOrWhiteSpace(search) && searchFields.Any())
             {
-                var likeParts = searchFields
-                    .Select(f => $"{f} LIKE @SearchStr");
-
-                // (name LIKE '%a%' OR code LIKE '%a%' OR phone LIKE '%a%')
+                var likeParts = searchFields.Select(f => $"{f} LIKE @SearchStr");
                 where += " AND (" + string.Join(" OR ", likeParts) + ") ";
             }
 
@@ -430,20 +430,23 @@ namespace MISA.CRM.Infrastructure.Repositories
 
             // 6. Query paging
             string sqlData = $@" SELECT * FROM {_tableName}
-                                 {where}
-                                 {orderClause}
-                                 LIMIT @Offset, @PageSize;";
+                         {where}
+                         {orderClause}
+                         LIMIT @Offset, @PageSize;";
 
             var param = new DynamicParameters();
             param.Add("@SearchStr", $"%{search}%");
             param.Add("@Offset", (page - 1) * pageSize);
             param.Add("@PageSize", pageSize);
 
+            if (!string.IsNullOrWhiteSpace(type))
+                param.Add("@Type", type);
+
             // 7. Thực hiện query song song
             var total = await conn.ExecuteScalarAsync<int>(sqlCount, param);
             var data = (await conn.QueryAsync<T>(sqlData, param)).ToList();
 
-            // 8. Trả về đúng format FE yêu cầu
+            // 8. Trả về format FE yêu cầu
             return new PagingResponse<T>
             {
                 Data = data,
@@ -455,6 +458,66 @@ namespace MISA.CRM.Infrastructure.Repositories
                 },
                 Error = null
             };
+        }
+
+        /// <summary>
+        /// Bulk insert dùng 1 query thực hiện cho toàn bộ danh sách
+        /// </summary>
+        /// <param name="entities">Danh sách entity cần insert</param>
+        /// Created By: TMHieu (12/12/2025)
+        /// <returns>Số bản ghi insert thành công</returns>
+        public async Task<int> BulkInsertAsync(IEnumerable<T> entities)
+        {
+            if (entities == null || !entities.Any())
+                return 0;
+
+            using var conn = Connection;
+
+            // Lấy danh sách property có [Column] để map cột
+            var properties = typeof(T).GetProperties()
+                .Where(p => p.GetCustomAttribute<ColumnAttribute>() != null)
+                .ToList();
+
+            // Chuỗi column DB
+            var columns = string.Join(", ", properties.Select(p => p.GetCustomAttribute<ColumnAttribute>()!.Name));
+
+            // Chuỗi param
+            var paramNames = string.Join(", ", properties.Select(p => "@" + p.Name));
+
+            // SQL insert
+            var sql = $"INSERT INTO {_tableName} ({columns}) VALUES ({paramNames});";
+
+            // Tạo DynamicParameters cho Dapper
+            var parametersList = entities.Select(entity =>
+            {
+                var parameters = new DynamicParameters();
+                foreach (var prop in properties)
+                {
+                    parameters.Add("@" + prop.Name, prop.GetValue(entity));
+                }
+                return parameters;
+            }).ToList();
+
+            int affectedRows = 0;
+
+            // Dapper không có ExecuteAsync(IEnumerable<DynamicParameters>) trực tiếp,
+            // nên dùng transaction để insert hàng loạt trong 1 lần
+            using var transaction = conn.BeginTransaction();
+            try
+            {
+                foreach (var param in parametersList)
+                {
+                    affectedRows += await conn.ExecuteAsync(sql, param, transaction: transaction);
+                }
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+
+            return affectedRows;
         }
     }
 }

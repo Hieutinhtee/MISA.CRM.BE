@@ -1,10 +1,13 @@
-﻿using MISA.CRM.Core.DTOs.Responses;
+﻿using CsvHelper;
+using CsvHelper.Configuration;
+using MISA.CRM.Core.DTOs.Responses;
 using MISA.CRM.CORE.Entities;
 using MISA.CRM.CORE.Exceptions;
 using MISA.CRM.CORE.Interfaces.Repositories;
 using MISA.CRM.CORE.Interfaces.Services;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -38,11 +41,12 @@ namespace MISA.CRM.CORE.Services
         /// <param name="value">Giá trị cần kiểm tra.</param>
         /// <param name="ignoreId">ID cần bỏ qua (khi update để tránh trùng chính nó).</param>
         /// <returns>Task hoàn thành sau khi kiểm tra.</returns>
-        protected async Task CheckDuplicateAsync(string propertyName, object value, Guid? ignoreId = null)
+        public async Task<bool> IsValueExistAsync(string propertyName, object value, Guid? ignoreId = null)
         {
             var exists = await _repo.IsValueExistAsync(propertyName, value, ignoreId);
             if (exists)
-                throw new ValidateException($"{propertyName} đã tồn tại", $"Giá trị '{value}' ở cột {propertyName} đã tồn tại");
+                throw new ValidateException($"Giá trị '{value}' ở cột {propertyName} đã tồn tại", $"Dữ liệu nhập đã tồn tại");
+            return exists;
         }
 
         /// <summary>
@@ -149,21 +153,79 @@ namespace MISA.CRM.CORE.Services
         }
 
         /// <summary>
-        /// Kiểm tra giá trị có tồn tại trong cột (bỏ qua soft delete và ignoreId nếu có)
-        /// Created By: TMHieu (07/12/2025)
-        /// </summary>
-        public virtual Task<bool> IsValueExistAsync(string columnName, object value, Guid? ignoreId = null)
-        {
-            return _repo.IsValueExistAsync(columnName, value, ignoreId);
-        }
-
-        /// <summary>
         /// Lấy danh sách entity có phân trang, tìm kiếm và sắp xếp
         /// Created By: TMHieu (07/12/2025)
         /// </summary>
-        public virtual Task<PagingResponse<T>> QueryPagingAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder)
+        public virtual Task<PagingResponse<T>> QueryPagingAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder, string? type = null)
         {
-            return _repo.QueryPagingAsync(page, pageSize, search, sortBy, sortOrder);
+            return _repo.QueryPagingAsync(page, pageSize, search, sortBy, sortOrder, type);
+        }
+
+        /// <summary>
+        /// Hàm map mặc định, dùng ClassMap của CsvHelper
+        /// Con có thể override nếu header CSV khác
+        /// Created By: TMHieu (07/12/2025)
+        /// </summary>
+        protected virtual ClassMap<T>? GetCsvClassMap()
+        {
+            return null; // default = null → CsvHelper tự map theo property
+        }
+
+        /// <summary>
+        /// Import dữ liệu từ Stream CSV và lưu vào DB
+        /// </summary>
+        /// <param name="fileStream">Stream của file CSV</param>
+        /// <returns>Số bản ghi insert thành công</returns>
+        public async Task<int> ImportFromCsvAsync(Stream fileStream)
+        {
+            if (fileStream == null || fileStream.Length == 0)
+                throw new ArgumentException("Stream rỗng.");
+
+            List<T> records;
+
+            using (var reader = new StreamReader(fileStream))
+            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                // Nếu con override map thì đăng ký
+                var map = GetCsvClassMap();
+                if (map != null)
+                {
+                    csv.Read();
+                    csv.ReadHeader();
+                    csv.Context.RegisterClassMap(map);
+                }
+
+                records = csv.GetRecords<T>().ToList();
+            }
+
+            if (!records.Any())
+                return 0;
+
+            // --- Bắt đầu gán Guid tự động ---
+            var guidProperty = typeof(T).GetProperties()
+                                        .FirstOrDefault(p => p.PropertyType == typeof(Guid));
+
+            if (guidProperty != null)
+            {
+                foreach (var record in records)
+                {
+                    var currentValue = (Guid)guidProperty.GetValue(record);
+                    if (currentValue == Guid.Empty) // chỉ gán nếu chưa có giá trị
+                    {
+                        guidProperty.SetValue(record, Guid.NewGuid());
+                    }
+                }
+            }
+            else
+            {
+                throw new Exception("Entity không có property CrmCustomerId kiểu Guid để cấp tự động.");
+            }
+            // --- Kết thúc gán Guid ---
+
+            // Gọi repository bulk insert
+            var insertedRows = await _repo.BulkInsertAsync(records);
+
+            return insertedRows;
         }
     }
 }
