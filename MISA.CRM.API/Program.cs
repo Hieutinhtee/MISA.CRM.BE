@@ -7,6 +7,7 @@ using MISA.CRM.Infrastructure.Repositories;
 using MySqlConnector;
 using Dapper;
 using System.ComponentModel.DataAnnotations.Schema;
+using OfficeOpenXml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +45,8 @@ builder.Services.AddCors(options =>
         });
 });
 
+//set license code cho EPPlus
+ExcelPackage.License.SetNonCommercialPersonal("thaiminhhieu");
 var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

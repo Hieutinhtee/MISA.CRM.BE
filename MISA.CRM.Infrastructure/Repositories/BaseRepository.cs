@@ -392,20 +392,18 @@ namespace MISA.CRM.Infrastructure.Repositories
 
             string orderClause = "";
 
-            if (!string.IsNullOrWhiteSpace(sortBy))
+            if (!string.IsNullOrWhiteSpace(sortBy) &&
+                (sortableFields == null || sortableFields.Count == 0 ||
+                sortableFields.Contains(sortBy.ToLower())) &&
+                !string.IsNullOrWhiteSpace(sortOrder))
             {
-                if (sortableFields == null || sortableFields.Count == 0 || sortableFields.Contains(sortBy.ToLower()))
-                {
-                    string direction = sortOrder?.ToUpper() == "DESC" ? "DESC" : "ASC";
-                    orderClause = $" ORDER BY {sortBy} {direction} ";
-                }
-                else
-                {
-                    orderClause = $" ORDER BY {_idColumn} DESC ";
-                }
+                // sortOrder = ASC/DESC
+                string direction = sortOrder.ToUpper() == "DESC" ? "DESC" : "ASC";
+                orderClause = $" ORDER BY {ToSnakeCase(sortBy)} {direction} ";
             }
             else
             {
+                // Không sort hoặc sortBy invalid → fallback sort theo khóa chính
                 orderClause = $" ORDER BY RIGHT({_defaultSortFiled}, 6) * 1 DESC";
             }
 

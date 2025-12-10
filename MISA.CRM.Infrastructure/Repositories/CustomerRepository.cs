@@ -28,8 +28,8 @@ namespace MISA.CRM.Infrastructure.Repositories
 
             string sql = @" SELECT crm_customer_code
                             FROM crm_customer
-                            ORDER BY crm_customer_code DESC
-                            LIMIT 1;";
+                            ORDER BY CAST(RIGHT(crm_customer_code, 6) AS UNSIGNED) DESC
+                            LIMIT 1";
 
             return await connection.QueryFirstOrDefaultAsync<string>(sql);
         }

@@ -1,4 +1,5 @@
-﻿using MISA.CRM.CORE.Entities;
+﻿using Microsoft.AspNetCore.Http;
+using MISA.CRM.CORE.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,5 +16,13 @@ namespace MISA.CRM.CORE.Interfaces.Services
         /// </summary>
         /// <returns>Mã khách hàng tiếp theo</returns>
         Task<string> NextCodeAsync();
+
+        /// <summary>
+        /// Import dữ liệu từ Stream CSV và lưu vào DB
+        /// </summary>
+        /// <param name="fileStream">Stream của file CSV</param>
+        /// <returns>Số bản ghi insert thành công</returns>
+        /// Created By: TMHieu (9/12/2025)
+        Task<int> ImportFromExcelAsync(IFormFile file);
     }
 }

@@ -84,13 +84,5 @@ namespace MISA.CRM.CORE.Interfaces.Services
         /// <returns>Đối tượng PagingResponse chứa dữ liệu và metadata</returns>
         /// Created By: TMHieu (07/12/2025)
         Task<PagingResponse<T>> QueryPagingAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder, string? type = null);
-
-        /// <summary>
-        /// Import dữ liệu từ Stream CSV và lưu vào DB
-        /// </summary>
-        /// <param name="fileStream">Stream của file CSV</param>
-        /// <returns>Số bản ghi insert thành công</returns>
-        /// Created By: TMHieu (9/12/2025)
-        Task<int> ImportFromCsvAsync(Stream fileStream);
     }
 }

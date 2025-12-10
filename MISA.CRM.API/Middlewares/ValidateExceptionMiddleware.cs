@@ -3,15 +3,41 @@ using System.Collections;
 using System.Diagnostics;
 using System.Text.Json;
 
+/// <summary>
+/// Middleware toàn cục có nhiệm vụ bắt (catch) các ngoại lệ (Exception) xảy ra trong luồng xử lý Request
+/// <para/>Ngoại lệ sẽ được chuyển đổi thành cấu trúc phản hồi JSON chuẩn hóa và trả về cho Client
+/// </summary>
+/// Created by TMHieu - 7/12/2025
 public class ValidateExceptionMiddleware
 {
+    #region Declaration
+
     private readonly RequestDelegate _next;
 
+    #endregion Declaration
+
+    #region Constructor
+
+    /// <summary>
+    /// Hàm khởi tạo Middleware
+    /// </summary>
+    /// <param name="next">Delegate trỏ đến Middleware tiếp theo trong pipeline</param>
+    /// Created by TMHieu - 7/12/2025
     public ValidateExceptionMiddleware(RequestDelegate next)
     {
         _next = next;
     }
 
+    #endregion Constructor
+
+    #region Method
+
+    /// <summary>
+    /// Thực thi Middleware: Bao bọc việc gọi Middleware tiếp theo trong khối try-catch để xử lý ngoại lệ
+    /// </summary>
+    /// <param name="context">Ngữ cảnh HTTP hiện tại</param>
+    /// <returns>Task</returns>
+    /// Created by TMHieu - 7/12/2025
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -20,22 +46,35 @@ public class ValidateExceptionMiddleware
         }
         catch (ValidateException ex)
         {
+            // Xử lý lỗi nghiệp vụ/validate: Trả về 400 Bad Request
             await HandleExceptionAsync(context, 400, "Dữ liệu không hợp lệ", ex);
         }
         catch (NotFoundException ex)
         {
+            // Xử lý lỗi không tìm thấy: Trả về 404 Not Found
             await HandleExceptionAsync(context, 404, "Không tìm thấy dữ liệu", ex);
         }
         catch (DuplicateException ex)
         {
+            // Xử lý lỗi trùng lặp: Trả về 409 Conflict
             await HandleExceptionAsync(context, 409, "Dữ liệu bị trùng", ex);
         }
         catch (Exception ex)
         {
+            // Xử lý tất cả các lỗi còn lại: Trả về 500 Internal Server Error
             await HandleExceptionAsync(context, 500, "Có lỗi xảy ra, vui lòng thử lại sau ít phút", ex);
         }
     }
 
+    /// <summary>
+    /// Hàm xử lý và chuẩn hóa ngoại lệ thành phản hồi JSON
+    /// </summary>
+    /// <param name="context">Ngữ cảnh HTTP</param>
+    /// <param name="statusCode">Mã trạng thái HTTP</param>
+    /// <param name="defaultUserMsg">Thông báo mặc định cho người dùng (nếu Exception không cung cấp UserMsg)</param>
+    /// <param name="ex">Đối tượng ngoại lệ</param>
+    /// <returns>Task</returns>
+    /// Created by TMHieu - 7/12/2025
     private async Task HandleExceptionAsync(HttpContext context, int statusCode, string defaultUserMsg, Exception ex)
     {
         context.Response.Clear();
@@ -56,7 +95,7 @@ public class ValidateExceptionMiddleware
                 break;
             }
         }
-        // fallback: frame 0 nếu không có frame có file
+        // Fallback: Lấy frame 0 nếu không tìm thấy frame nào có thông tin file
         targetFrame ??= st.GetFrame(0);
 
         string? file = targetFrame?.GetFileName();
@@ -80,7 +119,7 @@ public class ValidateExceptionMiddleware
             return list;
         }
 
-        // Lấy ex.Data (nếu có)
+        // Lấy ex.Data (nếu có) và chuyển đổi sang Dictionary để serialize
         IDictionary? dataDict = null;
         if (ex.Data != null && ex.Data.Count > 0)
         {
@@ -93,16 +132,16 @@ public class ValidateExceptionMiddleware
                 }
                 catch
                 {
-                    // ignore any non-string keys
+                    // Bỏ qua các key không phải chuỗi
                 }
             }
         }
 
-        // Nếu BaseException có trường chứa chi tiết lỗi (ví dụ Errors hoặc Details), cố gắng lấy ra
+        // Nếu BaseException có trường chứa chi tiết lỗi (ví dụ Errors hoặc Details), cố gắng lấy ra bằng Reflection
         object? validationErrors = null;
         if (baseEx != null)
         {
-            // common property names to try
+            // Các tên thuộc tính thường gặp cần kiểm tra
             var candidateNames = new[] { "Errors", "Details", "ValidationErrors", "MoreInfo" };
             var beType = baseEx.GetType();
             foreach (var name in candidateNames)
@@ -120,7 +159,7 @@ public class ValidateExceptionMiddleware
             }
         }
 
-        // build dev message object
+        // Tạo đối tượng chứa thông tin chi tiết lỗi cho nhà phát triển (Dev Message)
         var devMsg = new
         {
             message = ex.Message,
@@ -134,21 +173,21 @@ public class ValidateExceptionMiddleware
             moreInfo = (baseEx?.MoreInfo)
         };
 
+        // Tạo cấu trúc phản hồi cuối cùng theo chuẩn PagingResponse (có trường error)
         var response = new
         {
             data = (object?)null,
             meta = (object?)null,
             error = new
             {
+                // Ưu tiên UserMsg trong Exception, nếu không có thì dùng defaultUserMsg
                 userMsg = baseEx?.UserMsg ?? defaultUserMsg,
                 devMsg,
                 traceId = context.TraceIdentifier
             }
         };
 
-        // Optionally: log full devMsg to server logs here as well
-        // e.g. logger?.LogError("Exception: {0}", JsonSerializer.Serialize(devMsg));
-
+        // Cấu hình JsonSerializer để format JSON (CamelCase, WriteIndented)
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -156,7 +195,9 @@ public class ValidateExceptionMiddleware
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
         };
 
-
+        // Ghi phản hồi JSON vào HttpContext
         await context.Response.WriteAsJsonAsync(response, options);
     }
+
+    #endregion Method
 }
