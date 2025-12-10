@@ -2,6 +2,7 @@
 using CsvHelper.Configuration;
 using Microsoft.AspNetCore.Http;
 using MISA.CRM.CORE.DTOs.Map;
+using MISA.CRM.CORE.DTOs.Responses;
 using MISA.CRM.CORE.Entities;
 using MISA.CRM.CORE.Exceptions;
 using MISA.CRM.CORE.Interfaces.Repositories;
@@ -88,7 +89,7 @@ namespace MISA.CRM.CORE.Services
         /// </summary>
         /// <param name="fileStream">Stream của file CSV</param>
         /// <returns>Số bản ghi insert thành công</returns>
-        public async Task<int> ImportFromExcelAsync(IFormFile file)
+        public async Task<ImportResult> ImportFromExcelAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 throw new ArgumentException("File rỗng.");
@@ -102,7 +103,7 @@ namespace MISA.CRM.CORE.Services
             var colCount = worksheet.Dimension?.Columns ?? 0;
 
             if (rowCount < 2)
-                return 0; // không có dữ liệu
+                throw new NotFoundException("Đọc file ra kết quả rỗng", "File gửi thiếu dữ liệu hoặc không hợp lệ");// không có dữ liệu
 
             // Lặp qua từng dòng, bỏ qua header (dòng 1)
             for (int row = 2; row <= rowCount; row++)
@@ -126,7 +127,11 @@ namespace MISA.CRM.CORE.Services
             }
 
             if (!records.Any())
-                return 0;
+                return new ImportResult
+                {
+                    Success = 0,
+                    Failed = 0
+                };
 
             // --- Bắt đầu gán Guid tự động ---
             var guidProperty = typeof(Customer).GetProperties()
@@ -167,7 +172,11 @@ namespace MISA.CRM.CORE.Services
                 }
             }
 
-            return insertedRows;
+            return new ImportResult
+            {
+                Success = insertedRows,
+                Failed = errRows
+            };
         }
 
         /// <summary>
@@ -211,6 +220,28 @@ namespace MISA.CRM.CORE.Services
 
             if (await _customerRepo.IsValueExistAsync("CrmCustomerEmail", customer.CrmCustomerEmail, ignoreId))
                 throw new ValidateException("Email duplicate", "Email đã tồn tại");
+        }
+
+        /// <summary>
+        /// Thực hiện xóa mềm (Soft Delete) hàng loạt cho danh sách ID khách hàng
+        /// <para/>Logic: Tăng giá trị `crm_customer_is_deleted` lên 1 so với giá trị lớn nhất hiện có của các bản ghi cùng Email/Phone
+        /// </summary>
+        /// <param name="ids">Danh sách ID (Guid) khách hàng cần xóa mềm</param>
+        /// <returns>Tổng số bản ghi đã bị ảnh hưởng</returns>
+        /// Created by TMHieu - 8/12/2025
+        public async Task<int> SoftDeleteManyAsync(List<Guid> ids)
+        {
+            // Kiểm tra input rỗng
+            if (ids == null || ids.Count == 0)
+                return 0;
+
+            // Có thể check id trùng
+            ids = ids.Distinct().ToList();
+
+            // Gọi repository xử lý soft delete
+            int affected = await _customerRepo.SoftDeleteManyAsync(ids);
+
+            return affected;
         }
 
         #endregion Method

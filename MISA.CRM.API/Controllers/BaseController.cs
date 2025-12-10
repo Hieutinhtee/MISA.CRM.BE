@@ -192,36 +192,6 @@ namespace MISA.CRM.API.Controllers
             return response;
         }
 
-        /// <summary>
-        /// Cập nhật một giá trị chung cho một trường dữ liệu của nhiều bản ghi (Bulk Update)
-        /// <para/>Sử dụng cho các nghiệp vụ như xóa mềm hàng loạt, cập nhật trạng thái hàng loạt...
-        /// </summary>
-        /// <param name="request">Thông tin danh sách id, tên cột, giá trị mới</param>
-        /// <returns>Số bản ghi đã được cập nhật</returns>
-        /// Created by TMHieu - 7/12/2025
-        [HttpPost("bulk-update")]
-        public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
-        {
-            if (request == null || request.Ids == null || request.Ids.Count == 0)
-                throw new ValidateException("Danh sách ID không được rỗng.");
-
-            if (string.IsNullOrWhiteSpace(request.ColumnName))
-                throw new ValidateException("Tên cột không được để trống.");
-
-            try
-            {
-                // Giá trị Value trong BulkUpdateRequest hiện đang là `int`.
-                // Do BaseService có thể xử lý cả int, string, bool, nên ta truyền thẳng `request.Value` đi
-                int updatedCount = await _service.BulkUpdateSameValueAsync(request.Ids, request.ColumnName, request.Value);
-                return Ok(new { updatedCount });
-            }
-            catch (Exception ex)
-            {
-                // Bắt và ném lại lỗi để Middleware xử lý (chuyển sang ValidateException)
-                throw new ValidateException($"Lỗi khi cập nhật: {ex.Message}");
-            }
-        }
-
         #endregion Method
     }
 }

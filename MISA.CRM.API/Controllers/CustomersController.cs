@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MISA.CRM.CORE.DTOs.Requests;
+using MISA.CRM.CORE.DTOs.Responses;
 using MISA.CRM.CORE.Entities;
 using MISA.CRM.CORE.Exceptions;
 using MISA.CRM.CORE.Interfaces.Repositories;
@@ -103,12 +104,34 @@ namespace MISA.CRM.API.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("File rỗng.");
 
-            int insertedCount;
-
             // Gọi service để đọc và import dữ liệu từ stream
-            insertedCount = await _customerService.ImportFromExcelAsync(file);
+            ImportResult res = await _customerService.ImportFromExcelAsync(file);
 
-            return Ok(new { insertedCount });
+            return Ok(res);
+        }
+
+        /// <summary>
+        /// Thực hiện xóa mềm (soft delete) hàng loạt các bản ghi Khách hàng
+        /// <para/>Sử dụng phương thức HTTP PUT để cập nhật trạng thái xóa mềm thay vì DELETE
+        /// </summary>
+        /// <param name="ids">Danh sách ID (Guid) của các bản ghi Khách hàng cần xóa mềm</param>
+        /// <returns>Kết quả HTTP 200 OK kèm theo số lượng bản ghi đã bị ảnh hưởng</returns>
+        /// Created by TMHieu - 7/12/2025
+        [HttpPut("soft-delete-many")]
+        public async Task<IActionResult> SoftDeleteMany([FromBody] List<Guid> ids)
+        {
+            if (ids == null || ids.Count == 0)
+            {
+                // Ném lỗi ValidateException để Middleware bắt, thay vì trả về BadRequest trực tiếp
+                throw new ValidateException("Danh sách Id trống.", "Danh sách ID không được để trống.");
+            }
+
+            int affected = await _customerService.SoftDeleteManyAsync(ids);
+
+            return Ok(new
+            {
+                TotalAffected = affected
+            });
         }
 
         #endregion Method
